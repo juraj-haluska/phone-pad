@@ -73,11 +73,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // if (bind(phoneSocketFd, (struct sockaddr *) &phoneSocketAddr, sizeof(phoneSocketAddr)) < 0) {
-  //   printf("error connecting to phone\n");
-  //   return 1;
-  // } 
-
   // send something (let app know ip:port of this machine)
   if (sendto(phoneSocketFd, buffer, 1, 0, (struct sockaddr*) &phoneSocketAddr, sizeof(phoneSocketAddr)) == -1) {
     printf("error sending data\n");

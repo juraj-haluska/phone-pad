@@ -1,9 +1,12 @@
 package net.spacive.apps.phonepad;
 
 import android.os.StrictMode;
+import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.AnimationUtils;
 import android.widget.LinearLayout;
@@ -23,9 +26,6 @@ public class MainActivity extends AppCompatActivity {
 
     public static final String TAG = "MainActivity";
 
-    private float prevX = 0;
-    private float prevY = 0;
-
     private boolean menuOpened = false;
 
     private LinearLayout layoutMenu;
@@ -37,6 +37,11 @@ public class MainActivity extends AppCompatActivity {
     private int cliPort = 0;
 
     private float sensitivity = 1;
+
+    private GestureDetectorCompat mDetector;
+
+    private float distX = 0;
+    private float distY = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,11 +89,13 @@ public class MainActivity extends AppCompatActivity {
             onSettingsClicked();
         });
 
-        getWindow().getDecorView().getRootView().setOnTouchListener((view, motionEvent) -> {
-            onTouch(motionEvent.getX(), motionEvent.getY());
-            view.performClick();
-            return false;
-        });
+        mDetector = new GestureDetectorCompat(this, new MyGestureListener());
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event){
+        this.mDetector.onTouchEvent(event);
+        return super.onTouchEvent(event);
     }
 
     private void onLeftClicked() {
@@ -129,37 +136,6 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
             Log.d(TAG, "interfaces error");
         }
-    }
-
-    private void onTouch(float x, float y) {
-        final float dx = x - prevX;
-        final float dy = y - prevY;
-
-        // try to send data
-        if (cliAddr != null && cliPort != 0) {
-            int X = Math.round(dx * sensitivity);
-            int Y = Math.round(dy * sensitivity);
-
-            String data = Integer.toString(X) + ":" + Integer.toString(Y);
-
-            DatagramPacket packet = new DatagramPacket(
-                    data.getBytes(),
-                    data.getBytes().length,
-                    cliAddr,
-                    cliPort
-            );
-
-            try {
-                socket.send(packet);
-                Log.d(TAG, "sending data ok: " + data);
-            } catch (IOException e) {
-                e.printStackTrace();
-                Log.d(TAG, "sending data fail: " + data);
-            }
-        }
-
-        prevX = x;
-        prevY = y;
     }
 
     private void waitForClient() {
@@ -207,5 +183,43 @@ public class MainActivity extends AppCompatActivity {
 
     private void onListeningFailed() {
         Log.d(TAG, "listening for client failed");
+    }
+
+    private class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
+
+        @Override
+        public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+
+            // try to send data
+            if (cliAddr != null && cliPort != 0) {
+                int X = Math.round(distanceX * -sensitivity);
+                int Y = Math.round(distanceY * -sensitivity);
+
+                String data = Integer.toString(X) + ":" + Integer.toString(Y);
+
+                DatagramPacket packet = new DatagramPacket(
+                        data.getBytes(),
+                        data.getBytes().length,
+                        cliAddr,
+                        cliPort
+                );
+
+                try {
+                    socket.send(packet);
+                    Log.d(TAG, "sending data ok: " + data);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    Log.d(TAG, "sending data fail: " + data);
+                }
+            }
+
+            return true;
+        }
+
+        @Override
+        public boolean onSingleTapUp(MotionEvent e) {
+            Log.d(TAG, "single tap");
+            return true;
+        }
     }
 }
