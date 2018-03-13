@@ -10,12 +10,11 @@ import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.net.SocketException;
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +30,11 @@ public class MainActivity extends AppCompatActivity {
 
     private LinearLayout layoutMenu;
 
-    private Socket clientSocket;
+    private DatagramSocket socket;
+    private byte[] buffer = new byte[256];
+
+    private InetAddress cliAddr = null;
+    private int cliPort = 0;
 
     private float sensitivity = 1;
 
@@ -97,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onSettingsClicked() {
-        listenForClient();
+        waitForClient();
     }
 
     private void onInfoClicked() {
@@ -132,20 +135,26 @@ public class MainActivity extends AppCompatActivity {
         final float dx = x - prevX;
         final float dy = y - prevY;
 
-        // send data
-        if (clientSocket != null && clientSocket.isConnected()) {
-
+        // try to send data
+        if (cliAddr != null && cliPort != 0) {
             int X = Math.round(dx * sensitivity);
             int Y = Math.round(dy * sensitivity);
 
-            String data = Integer.toString(X) + ":" + Integer.toString(Y) + "\r\n";
+            String data = Integer.toString(X) + ":" + Integer.toString(Y);
 
-            Log.d(TAG, "sending data: " + data);
+            DatagramPacket packet = new DatagramPacket(
+                    data.getBytes(),
+                    data.getBytes().length,
+                    cliAddr,
+                    cliPort
+            );
 
             try {
-                clientSocket.getOutputStream().write(data.getBytes());
+                socket.send(packet);
+                Log.d(TAG, "sending data ok: " + data);
             } catch (IOException e) {
                 e.printStackTrace();
+                Log.d(TAG, "sending data fail: " + data);
             }
         }
 
@@ -153,35 +162,46 @@ public class MainActivity extends AppCompatActivity {
         prevY = y;
     }
 
-    private void listenForClient() {
-        Log.d(TAG, "listening for client");
+    private void waitForClient() {
+        Log.d(TAG, "waiting for client");
 
-        final ServerSocket serverSocket;
+        final DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
         try {
-            serverSocket = new ServerSocket(8000);
+
+            if (socket != null) {
+                socket.disconnect();
+                socket.close();
+                socket = null;
+            }
+
+            socket = new DatagramSocket(8000);
 
             new Thread(() -> {
                 try {
-                    clientSocket = serverSocket.accept();
-                    runOnUiThread(() -> onClientConnected());
+                    socket.receive(packet);
+                    runOnUiThread(() -> onClientAvailable(
+                            packet.getAddress(),
+                            packet.getPort()
+                    ));
                 } catch (IOException e) {
                     e.printStackTrace();
                     runOnUiThread(() -> onListeningFailed());
-                } finally {
-                    try {
-                        serverSocket.close();
-                    } catch (IOException e1) { }
-                    Log.d(TAG, "finally called");
                 }
             }).start();
-        } catch (IOException e) {
+        } catch (SocketException e) {
             e.printStackTrace();
             runOnUiThread(() -> onListeningFailed());
         }
     }
 
-    private void onClientConnected() {
+    private void onClientAvailable(InetAddress addr, int port) {
+
+        Toast.makeText(this, "client connected", Toast.LENGTH_SHORT).show();
+
+        cliAddr = addr;
+        cliPort = port;
+
         Log.d(TAG, "client connected");
     }
 

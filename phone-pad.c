@@ -67,25 +67,38 @@ int main(int argc, char **argv) {
   }
 
   // open socket and connect
-  phoneSocketFd = socket(AF_INET, SOCK_STREAM, 0);
+  phoneSocketFd = socket(AF_INET, SOCK_DGRAM, 0);
   if (phoneSocketFd < 0) {
     printf("error opening socket\n");
     return 1;
   }
 
-  if (connect(phoneSocketFd, (struct sockaddr *) &phoneSocketAddr, sizeof(phoneSocketAddr)) < 0) {
-    printf("error connecting to phone\n");
+  // if (bind(phoneSocketFd, (struct sockaddr *) &phoneSocketAddr, sizeof(phoneSocketAddr)) < 0) {
+  //   printf("error connecting to phone\n");
+  //   return 1;
+  // } 
+
+  // send something (let app know ip:port of this machine)
+  if (sendto(phoneSocketFd, buffer, 1, 0, (struct sockaddr*) &phoneSocketAddr, sizeof(phoneSocketAddr)) == -1) {
+    printf("error sending data\n");
     return 1;
-  } 
+  }
+
+  int addrLen = sizeof(phoneSocketAddr);
 
   int end = 0;
   while(!end) {
     memset(buffer, '\0', BUFF_SIZE);
-    char * buf_ptr = buffer;
-    do {
-      read(phoneSocketFd, buf_ptr, 1);
-    } while (*(buf_ptr++) != '\n' && (buf_ptr - buffer + 1) < BUFF_SIZE);
-    
+
+    int recv_len = recvfrom(
+      phoneSocketFd,
+      buffer,
+      BUFF_SIZE,
+      0,
+      (struct sockaddr *) &phoneSocketAddr,
+      &addrLen
+    );
+
     int x;
     int y;
 
